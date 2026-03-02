@@ -1,0 +1,16 @@
+{
+    "data": {
+        "uuid": "merchant_uuid_abc",
+        "business_name": "ACME Ltd",
+        "business_email": "finance@acme.example",
+        "support_email": "support@example.com",
+        "support_phone": "+2348012345678",
+        "address": "123 Business St",
+        "site_url": "https://merchant.example",
+        "status": "Active",
+        "bear_local_fees": false,
+        "bear_inter_fees": false,
+        "created_at": "2026-02-01T12:00:00Z"
+    }
+}
+

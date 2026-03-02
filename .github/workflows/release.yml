@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: json, openssl, curl
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/phpunit
+
+      - name: Build release archive
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          ARCHIVE="bobospay-php-${VERSION}.zip"
+
+          # Install production dependencies only for the archive
+          composer install --prefer-dist --no-progress --no-interaction --no-dev --optimize-autoloader
+
+          zip -r "${ARCHIVE}" \
+            src/ \
+            autoload.php \
+            composer.json \
+            LICENSE \
+            README.md \
+            --exclude "*.git*"
+
+          echo "ARCHIVE=${ARCHIVE}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          # Extract the section for this tag from CHANGELOG.md if it exists
+          if [ -f CHANGELOG.md ]; then
+            # Grab lines between this version header and the next one
+            NOTES=$(awk "/^## \[?${VERSION//v/}\]?/{found=1; next} found && /^## /{exit} found{print}" CHANGELOG.md)
+          fi
+
+          if [ -z "${NOTES}" ]; then
+            NOTES="See [CHANGELOG.md](CHANGELOG.md) for details."
+          fi
+
+          # Write to file to preserve newlines
+          echo "${NOTES}" > release_notes.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: "Release ${{ env.VERSION }}"
+          body_path: release_notes.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: ${{ env.ARCHIVE }}
+

@@ -1,0 +1,18 @@
+{
+    "data": [
+        {
+            "id": 123,
+            "uuid": "tx_abc",
+            "amount": 1000.00,
+            "total": 1000.00,
+            "fees": 20.00,
+            "bear_the_fees": false,
+            "status": "Pending",
+            "currency": "NGN",
+            "customer": { "id": 12, "firstname": "Jane" },
+            "created_at": "2026-02-26T00:00:00Z"
+        }
+    ],
+    "meta": { "current_page": 1, "per_page": 15, "total": 1 }
+}
+

@@ -1,0 +1,10 @@
+{
+    "status": "error",
+    "message": "The given data was invalid.",
+    "errors": {
+        "amount": ["The amount field is required."],
+        "currency": ["The currency field is required."],
+        "callback_url": ["The callback url field is required."]
+    }
+}
+

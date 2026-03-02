@@ -1,0 +1,27 @@
+{
+    "data": {
+        "id": 124,
+        "uuid": "tx_xyz",
+        "amount": 1500.00,
+        "total": 1500.00,
+        "fees": 30.00,
+        "bear_the_fees": false,
+        "status": "Pending",
+        "note": "Order #1234",
+        "callback_url": "https://merchant.example/callback",
+        "custom_data": null,
+        "channels": ["card"],
+        "mobile_channels": null,
+        "paid_at": null,
+        "currency": "NGN",
+        "customer": {
+            "id": 12,
+            "firstname": "Jane",
+            "lastname": "Doe",
+            "email": "jane@example.com"
+        },
+        "created_at": "2026-02-26T00:00:00Z",
+        "updated_at": "2026-02-26T00:00:00Z"
+    }
+}
+

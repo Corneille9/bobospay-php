@@ -1,206 +1,348 @@
 # Bobospay PHP SDK
 
-The Bobospay PHP SDK enables seamless integration with Bobospay's payment processing API for PHP applications. It provides tools for managing transactions, customers, and currencies, making it easy to process online payments via credit cards and mobile money in your PHP applications. Compatible with popular frameworks such as Laravel, Symfony, and CodeIgniter.
+Official PHP SDK for the **Bobospay Merchant API v2**. Provides a clean, typed interface for managing transactions, customers, currencies, and account data. Framework-agnostic with first-class Laravel support.
 
-You can sign up for a Bobospay account at [https://bobospay.com](https://bobospay.com).
+Sign up for a Bobospay merchant account at [https://bobospay.com](https://bobospay.com).
+
+---
 
 ## Requirements
 
-- PHP 5.6 and later
-- cURL extension
-- JSON extension  
-- OpenSSL extension
+- PHP 8.1 or later
+- `json` extension
+- `openssl` extension
 
 ## Installation
-
-### Composer (Recommended)
-
-You can install the SDK via [Composer](http://getcomposer.org/). Run the following command:
 
 ```bash
 composer require bobospay/bobospay-php
 ```
 
-### Manual Installation
+## Without Composer
 
-If you do not wish to use Composer, you can download the [latest release](https://github.com/bobospay/bobospay-php/releases). Then, to use the SDK, include the `init.php` file:
+If you cannot use Composer, download or clone the repository and use the
+provided `autoload.php` file. The SDK still requires **Guzzle 7** as an HTTP
+client, so you need to load it first.
 
-```php
-require_once('/path/to/bobospay-php/init.php');
+```
+your-project/
+    guzzlehttp/          <-- guzzle and its dependencies
+    bobospay-php/        <-- this SDK
+        autoload.php
+        src/
+    index.php
 ```
 
-## Getting Started
-
-### Basic Configuration
-
-First, configure your Bobospay credentials and environment:
-
 ```php
-use Bobospay\Bobospay;
+<?php
 
-// Set your client credentials
-Bobospay::setClientId('YOUR_CLIENT_ID');
-Bobospay::setClientSecret('YOUR_CLIENT_SECRET');
+// 1. Load Guzzle (adjust the path to match your setup)
+require_once __DIR__ . '/guzzlehttp/autoload.php';
 
-// Set environment (sandbox for testing, live for production)
-Bobospay::setEnvironment('sandbox'); // or 'live'
+// 2. Load the Bobospay SDK
+require_once __DIR__ . '/bobospay-php/autoload.php';
+
+use Bobospay\BobospayClient;
+use Bobospay\DTOs\CreateTransactionDTO;
+use Bobospay\Exceptions\ApiException;
+
+$bobospay = new BobospayClient('ci_live_your_client_id', 'your_client_secret');
+
+try {
+    $response = $bobospay->transactions()->create(new CreateTransactionDTO(
+        amount: 1500.00,
+        currency: 'NGN',
+        callbackUrl: 'https://yoursite.com/payment/callback',
+        note: 'Order #1234',
+    ));
+
+    $token = $bobospay->transactions()->generateToken($response['data']['id']);
+    header('Location: ' . $token['data']['url']);
+    exit;
+} catch (ApiException $e) {
+    echo 'Payment error: ' . $e->getMessage();
+}
 ```
 
-### Use Cases
+> The `autoload.php` loader skips framework-specific classes
+> (`Bobospay\Integrations\Laravel\*`) since they require Laravel packages
+> that would not be available in a plain PHP setup.
 
-#### Creating a Customer
+---
 
-```php
-use Bobospay\Bobospay;
-use Bobospay\Customer;
-
-// Configure Bobospay
-Bobospay::setClientId('YOUR_CLIENT_ID');
-Bobospay::setClientSecret('YOUR_CLIENT_SECRET');
-Bobospay::setEnvironment('sandbox');
-
-// Create a customer
-$customer = Customer::create([
-    'firstname' => 'John',
-    'lastname' => 'Doe',
-    'email' => 'john.doe@example.com',
-    'phone' => '+22966666600'
-]);
-
-echo "Customer created with ID: " . $customer->id;
-```
-
-#### Creating a Transaction
+## Quick start
 
 ```php
-use Bobospay\Bobospay;
-use Bobospay\Transaction;
+use Bobospay\BobospayClient;
+use Bobospay\DTOs\CreateTransactionDTO;
 
-// Configure Bobospay
-Bobospay::setClientId('YOUR_CLIENT_ID');
-Bobospay::setClientSecret('YOUR_CLIENT_SECRET');
-Bobospay::setEnvironment('sandbox');
+$bobospay = new BobospayClient(
+    'ci_live_your_client_id',
+    'your_client_secret',
+);
 
 // Create a transaction
-$transaction = Transaction::create([
-    'note' => 'Payment for order #1234',
-    'amount' => 1000, // Amount in smallest currency unit (e.g., cents)
-    'currency' => 'XOF',
-    'callback_url' => 'https://example.com/callback',
-    'customer' => ['id' => 1] // Customer ID from previous example, you use email, or provide all customer details
-    'custom_data' => ['order_id' => '1234']
+$response = $bobospay->transactions()->create(new CreateTransactionDTO(
+    amount: 1500.00,
+    currency: 'NGN',
+    callbackUrl: 'https://yoursite.com/payment/callback',
+    note: 'Order #1234',
+));
+
+$transactionId = $response['data']['id'];
+
+// Generate a checkout URL
+$token = $bobospay->transactions()->generateToken($transactionId);
+$checkoutUrl = $token['data']['url'];
+
+// Redirect the customer to $checkoutUrl
+```
+
+## Environment detection
+
+The SDK **automatically** determines the API endpoint from the `client_id` prefix.
+
+| Prefix      | Environment | Base URL                           |
+|-------------|-------------|------------------------------------|
+| `ci_test_*` | Sandbox     | `https://sandbox.bobospay.com/api` |
+| `ci_live_*` | Production  | `https://bobospay.com/api`         |
+
+```php
+// Sandbox -- automatically hits sandbox.bobospay.com
+$bobospay = new BobospayClient('ci_test_abc123', 'your_test_secret');
+
+// Production -- automatically hits bobospay.com
+$bobospay = new BobospayClient('ci_live_abc123', 'your_live_secret');
+```
+
+## Configuration options
+
+The constructor accepts an optional third argument for HTTP settings:
+
+```php
+$bobospay = new BobospayClient('ci_live_abc123', 'secret', [
+    'timeout'    => 60,    // Request timeout in seconds (default: 30)
+    'verify_ssl' => false, // Disable SSL verification (default: true)
 ]);
-
-//$transaction = Transaction::create([
-//    'description' => 'Payment for order #1234',
-//    'amount' => 1000, // Amount in smallest currency unit (e.g., cents)
-//    'currency' => 'XOF',
-//    'callback_url' => 'https://example.com/callback',
-//    'customer' => [
-//        'firstname' => 'John',
-//        'lastname' => 'Doe',
-//        'email' => 'john.doe@example.com',
-//        'phone' => '+22966666600'
-//    ],
-//]);
-
-echo "Transaction created with ID: " . $transaction->id;
 ```
 
-#### Retrieving a Transaction
+## Usage
+
+### Account
 
 ```php
-use Bobospay\Bobospay;
-use Bobospay\Transaction;
+// Merchant profile
+$profile = $bobospay->account()->get();
+echo $profile['data']['business_name'];
 
-// Configure Bobospay
-Bobospay::setClientId('YOUR_CLIENT_ID');
-Bobospay::setClientSecret('YOUR_CLIENT_SECRET');
-Bobospay::setEnvironment('sandbox');
+// Wallet balances
+$balances = $bobospay->account()->balances();
 
-// Retrieve a specific transaction
-$transaction = Transaction::retrieve('transaction_id_here');
-echo "Transaction status: " . $transaction->status;
+// Active currencies for this app
+$currencies = $bobospay->account()->currencies();
+
+// Enabled payment methods
+$methods = $bobospay->account()->paymentMethods();
 ```
 
-#### Listing All Customers
+### Transactions
 
 ```php
-use Bobospay\Bobospay;
-use Bobospay\Customer;
+use Bobospay\DTOs\CreateTransactionDTO;
 
-// Configure Bobospay
-Bobospay::setClientId('YOUR_CLIENT_ID');
-Bobospay::setClientSecret('YOUR_CLIENT_SECRET');
-Bobospay::setEnvironment('sandbox');
+// List transactions (paginated)
+$list = $bobospay->transactions()->list(page: 1, perPage: 25);
 
-// Get all customers
-$customers = Customer::all();
-foreach ($customers->customers as $customer) {
-    echo "Customer: " . $customer->firstname . " " . $customer->lastname . "\n";
+// Create a transaction
+$response = $bobospay->transactions()->create(new CreateTransactionDTO(
+    amount: 2000.00,
+    currency: 'XOF',
+    callbackUrl: 'https://yoursite.com/callback',
+    note: 'Invoice #5678',
+    channels: ['mobile_money', 'card'],
+    mobileChannels: ['mtn', 'moov'],
+    customer: [
+        'firstname' => 'Jane',
+        'lastname'  => 'Doe',
+        'email'     => 'jane@example.com',
+    ],
+    customData: ['invoice_id' => '5678'],
+));
+
+// Create with an idempotency key (prevents duplicate transactions on retries)
+$response = $bobospay->transactions()->create($dto, idempotencyKey: 'unique-key-123');
+
+// Retrieve a transaction
+$tx = $bobospay->transactions()->find(124);
+echo $tx['data']['status']; // "Pending", "Successful", etc.
+
+// Generate a checkout token and URL
+$token = $bobospay->transactions()->generateToken(124);
+$checkoutUrl = $token['data']['url'];
+```
+
+### Customers
+
+```php
+use Bobospay\DTOs\CreateCustomerDTO;
+
+// List customers (paginated)
+$list = $bobospay->customers()->list(page: 1, perPage: 15);
+
+// Create or update a customer (upsert by email)
+$customer = $bobospay->customers()->create(new CreateCustomerDTO(
+    firstname: 'Jane',
+    lastname: 'Doe',
+    email: 'jane@example.com',
+    phone: '08012345678',
+));
+
+// Retrieve a customer
+$customer = $bobospay->customers()->find(12);
+```
+
+### Currencies
+
+```php
+// List all active currencies
+$currencies = $bobospay->currencies()->list();
+// $currencies['data'] => ["NGN", "GHS", "USD", ...]
+```
+
+## Webhook verification
+
+Bobospay signs webhook payloads with an HMAC-SHA256 signature using your `client_secret`. The SDK provides a helper to verify incoming webhooks:
+
+```php
+use Bobospay\Webhook\WebhookValidator;
+
+$validator = new WebhookValidator('your_client_secret');
+
+$payload   = file_get_contents('php://input');
+$signature = $_SERVER['HTTP_X_BOBOSPAY_SIGNATURE'] ?? '';
+
+// Option 1: boolean check
+if ($validator->isValid($payload, $signature)) {
+    $data = json_decode($payload, true);
+    // process the webhook...
+}
+
+// Option 2: validate and decode in one step (throws on invalid signature)
+try {
+    $data = $validator->validate($payload, $signature);
+    // process $data...
+} catch (\Bobospay\Exceptions\BobospayException $e) {
+    http_response_code(400);
+    echo 'Invalid signature';
 }
 ```
 
-#### Managing Currencies
+## Error handling
+
+The SDK throws typed exceptions so you can handle each error case individually:
 
 ```php
-use Bobospay\Bobospay;
-use Bobospay\Currency;
+use Bobospay\Exceptions\AuthenticationException;
+use Bobospay\Exceptions\ValidationException;
+use Bobospay\Exceptions\NotFoundException;
+use Bobospay\Exceptions\NotAcceptableException;
+use Bobospay\Exceptions\ApiException;
 
-// Configure Bobospay
-Bobospay::setClientId('YOUR_CLIENT_ID');
-Bobospay::setClientSecret('YOUR_CLIENT_SECRET');
-Bobospay::setEnvironment('sandbox');
-
-// Get all available currencies
-$currencies = Currency::all();
-foreach ($currencies->currencies as $currency) {
-    echo "Currency: " . $currency->name . " (" . $currency->iso . ")\n";
+try {
+    $tx = $bobospay->transactions()->find(99999);
+} catch (AuthenticationException $e) {
+    // 401 -- Invalid credentials
+} catch (NotFoundException $e) {
+    // 404 -- Resource not found
+} catch (ValidationException $e) {
+    // 422 -- Validation failed
+    $fieldErrors = $e->getErrors();
+    // ['amount' => ['The amount field is required.']]
+} catch (NotAcceptableException $e) {
+    // 406 -- Operation not allowed for current resource state
+} catch (ApiException $e) {
+    // Any other API error
+    $status = $e->getStatusCode();
 }
-
-// Get a specific currency
-$currency = Currency::retrieve('currency_id_here');
-echo "Currency details: " . $currency->name;
 ```
 
-#### Generating Payment Token
+All exceptions extend `Bobospay\Exceptions\BobospayException`, so you can also catch that as a catch-all.
+
+## Laravel integration
+
+The SDK ships with a Laravel service provider that auto-registers via package discovery.
+
+### 1. Publish the configuration
+
+```bash
+php artisan vendor:publish --tag=bobospay-config
+```
+
+### 2. Set your environment variables
+
+```env
+BOBOSPAY_CLIENT_ID=ci_live_your_client_id
+BOBOSPAY_CLIENT_SECRET=your_client_secret
+```
+
+### 3. Use via dependency injection
 
 ```php
-use Bobospay\Bobospay;
-use Bobospay\Transaction;
+use Bobospay\BobospayClient;
+use Bobospay\DTOs\CreateTransactionDTO;
 
-// Configure Bobospay
-Bobospay::setClientId('YOUR_CLIENT_ID');
-Bobospay::setClientSecret('YOUR_CLIENT_SECRET');
-Bobospay::setEnvironment('sandbox');
+class PaymentController extends Controller
+{
+    public function __construct(private BobospayClient $bobospay) {}
 
-// Create transaction first
-$transaction = Transaction::create([
-    'description' => 'Payment for order #1234',
-    'amount' => 1000,
-    'currency' => 'XOF',
-    'callback_url' => 'https://example.com/callback'
-]);
+    public function pay(Request $request)
+    {
+        $response = $this->bobospay->transactions()->create(new CreateTransactionDTO(
+            amount: $request->input('amount'),
+            currency: 'NGN',
+            callbackUrl: route('payment.callback'),
+        ));
 
-// Generate payment token
-$token = $transaction->generateToken();
-echo "Payment token: " . $token->token;
+        $token = $this->bobospay->transactions()->generateToken($response['data']['id']);
+
+        return redirect($token['data']['url']);
+    }
+}
 ```
 
-## Documentation
+### 4. Or use the Facade
 
-Please see [https://docs.bobospay.com](https://docs.bobospay.com) for up-to-date API documentation.
+```php
+use Bobospay\Integrations\Laravel\BobospayFacade as Bobospay;
 
-## Development
+$profile = Bobospay::account()->get();
+$tx = Bobospay::transactions()->create($dto);
+```
 
-Install dependencies:
+## Testing
+
+The SDK provides an `HttpClientInterface` that you can swap out in tests:
+
+```php
+use Bobospay\BobospayClient;
+
+// Create a client with a custom/mock HTTP implementation
+$client = BobospayClient::withHttpClient($mockHttpClient);
+```
+
+### Running the SDK test suite
 
 ```bash
 composer install
+vendor/bin/phpunit
 ```
 
-Run tests:
+## Security
 
-```bash
-composer test
-```
+- **Never expose your `client_secret` in client-side code.** It is used directly as the Bearer token.
+- Always validate webhook signatures before processing payloads.
+- Use environment variables to store credentials.
+
+## License
+
+MIT License. See [LICENSE](LICENSE) for details.
