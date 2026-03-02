@@ -28,7 +28,11 @@ jobs:
           coverage: none
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
+        # composer update (not install) lets each PHP version resolve
+        # the highest compatible set of packages from the constraints
+        # defined in composer.json, ignoring the lock file versions
+        # that were generated on a different PHP version.
+        run: composer update --prefer-dist --no-progress --no-interaction
 
       - name: Run tests
         run: vendor/bin/phpunit
